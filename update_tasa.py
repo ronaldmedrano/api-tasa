@@ -2,42 +2,62 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
+import urllib3
 from datetime import datetime
 
-def obtener_tasas_bcv():
+# Silenciar advertencias de SSL
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def obtener_datos_bcv():
     url = "https://www.bcv.org.ve/"
-    # El 'headers' es clave para que el BCV te deje entrar
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-    response = requests.get(url, headers=headers, verify=False)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
+    response = requests.get(url, headers=headers, verify=False, timeout=15)
     soup = BeautifulSoup(response.text, 'html.parser')
     
-    # Buscamos los valores (Asegúrate de que los IDs coincidan con la web actual del BCV)
+    # 1. Extraer Fecha (usando el atributo content del span)
+    fecha_tag = soup.find('span', class_='date-display-single')
+    fecha_iso = fecha_tag.get('content')
+    fecha_formateada = fecha_iso.split('T')[0] 
+    año_carpeta = fecha_formateada.split('-')[0]
+    
+    # 2. Extraer Tasas (Usando los IDs que proporcionaste)
+    # Buscamos el div por ID y luego el fuerte <strong> dentro
     dolar_str = soup.find('div', id='dolar').find('strong').text.strip().replace(',', '.')
     euro_str = soup.find('div', id='euro').find('strong').text.strip().replace(',', '.')
     
+    print(f"Fecha extraída: {fecha_formateada}")
+    print(f"USD: {dolar_str} | EUR: {euro_str}")
+    
     return [
-        {"moneda": "USD", "tasa": float(dolar_str), "fecha": datetime.now().strftime('%Y-%m-%d')},
-        {"moneda": "EUR", "tasa": float(euro_str), "fecha": datetime.now().strftime('%Y-%m-%d')}
+        {"moneda": "USD", "tasa": float(dolar_str), "fecha": fecha_formateada, "año": año_carpeta},
+        {"moneda": "EUR", "tasa": float(euro_str), "fecha": fecha_formateada, "año": año_carpeta}
     ]
 
-def guardar_tasas(tasas):
-    for tasa in tasas:
-        año = datetime.now().strftime('%Y')
-        carpeta = f"tasa/{tasa['moneda']}/{año}"
+def guardar_tasas(lista_tasas):
+    for item in lista_tasas:
+        carpeta = f"tasa/{item['moneda']}/{item['año']}"
         os.makedirs(carpeta, exist_ok=True)
         
-        archivo = f"{carpeta}/{tasa['fecha']}.json"
+        archivo = f"{carpeta}/{item['fecha']}.json"
         
         data = [{
             "fuente": "BCV",
-            "moneda": tasa['moneda'],
-            "tasa": tasa['tasa'],
-            "fecha": tasa['fecha']
+            "moneda": item['moneda'],
+            "tasa": item['tasa'],
+            "fecha": item['fecha']
         }]
         
         with open(archivo, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"Archivo generado: {archivo}")
 
 if __name__ == "__main__":
-    tasas = obtener_tasas_bcv()
-    guardar_tasas(tasas)
+    try:
+        datos = obtener_datos_bcv()
+        guardar_tasas(datos)
+        print("Proceso finalizado correctamente.")
+    except Exception as e:
+        print(f"Error durante la ejecución: {e}")

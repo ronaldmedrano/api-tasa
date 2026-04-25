@@ -1,22 +1,29 @@
 name: Actualizar Tasas BCV
+
 on:
   schedule:
-    # 0 21 * * * significa: Todos los días a las 21:00 UTC
-    # Como Venezuela es UTC-4, esto son las 5:00 PM VET
+    # Programación en UTC (VET + 4 horas)
+    # 4:01 PM VET -> 20:01 UTC
+    - cron: '1 20 * * *'
+    # 4:05 PM VET -> 20:05 UTC
+    - cron: '5 20 * * *'
+    # 4:10 PM VET -> 20:10 UTC
+    - cron: '10 20 * * *'
+    # 5:00 PM VET -> 21:00 UTC
     - cron: '0 21 * * *'
-  workflow_dispatch: # Esto permite que tú lo ejecutes manualmente cuando quieras probarlo
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # IMPORTANTE: Permite que el script suba cambios al repo
+      contents: write
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configurar Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
@@ -31,5 +38,10 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add .
-          git commit -m "Auto: Actualizacion tasas ${{ github.run_id }}" || exit 0
-          git push
+          # Solo hace commit si hay cambios detectados
+          if ! git diff --cached --exit-code; then
+            git commit -m "Auto: Actualizacion tasas ${{ github.run_id }}"
+            git push
+          else
+            echo "Sin cambios, todo está al día."
+          fi
