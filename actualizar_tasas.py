@@ -44,7 +44,7 @@ def guardar_tasas(lista_tasas):
         archivo = f"{carpeta}/{item['fecha']}.json"
         
         data = [{
-            "fuente": "BCV",
+            "fuente": "oficial",
             "moneda": item['moneda'],
             "tasa": item['tasa'],
             "fecha": item['fecha']
