@@ -2,8 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
+import sys
 import urllib3
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # Silenciar advertencias de SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -54,10 +55,39 @@ def guardar_tasas(lista_tasas):
             json.dump(data, f, indent=2, ensure_ascii=False)
         print(f"Archivo generado: {archivo}")
 
+def proximo_dia_habil(fecha):
+    """Retorna el próximo día hábil: el viernes devuelve el lunes siguiente."""
+    # weekday(): 0=lunes ... 4=viernes
+    if fecha.weekday() == 4:  # viernes
+        return fecha + timedelta(days=3)
+    return fecha + timedelta(days=1)
+
+def ya_existe_tasa_hoy():
+    """Verifica si ya se guardó la tasa del próximo día hábil.
+    El BCV publica cada día la tasa del día siguiente, y el viernes
+    publica la del lunes próximo.
+    """
+    vet = timezone(timedelta(hours=-4))
+    hoy = datetime.now(vet).date()
+    proximo = proximo_dia_habil(hoy)
+    fecha_str = proximo.strftime("%Y-%m-%d")
+    año = proximo.strftime("%Y")
+
+    monedas = ["USD", "EUR"]
+    for moneda in monedas:
+        archivo = f"tasa/{moneda}/{año}/{fecha_str}.json"
+        if not os.path.exists(archivo):
+            return False
+    print(f"Las tasas del {fecha_str} ya fueron registradas. No se realizará una nueva consulta.")
+    return True
+
 if __name__ == "__main__":
+    if ya_existe_tasa_hoy():
+        sys.exit(0)
     try:
         datos = obtener_datos_bcv()
         guardar_tasas(datos)
         print("Proceso finalizado correctamente.")
     except Exception as e:
         print(f"Error durante la ejecución: {e}")
+        sys.exit(1)

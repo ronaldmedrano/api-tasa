@@ -2,15 +2,18 @@ name: Actualizar Tasas BCV
 
 on:
   schedule:
-    # Programación en UTC (VET + 4 horas)
-    # 4:01 PM VET -> 20:01 UTC
-    - cron: '1 20 * * *'
-    # 4:05 PM VET -> 20:05 UTC
-    - cron: '5 20 * * *'
-    # 4:10 PM VET -> 20:10 UTC
-    - cron: '10 20 * * *'
-    # 5:00 PM VET -> 21:00 UTC
-    - cron: '0 21 * * *'
+    # Horario: lunes a viernes, de 4:00 PM a 8:00 PM (hora Venezuela, VET = UTC-4)
+    # En UTC: de 20:00 a 00:00 (siguiente día UTC)
+    # Cada 30 minutos dentro de esa ventana horaria:
+    - cron: '0 20 * * 1-5'   # 4:00 PM VET
+    - cron: '30 20 * * 1-5'  # 4:30 PM VET
+    - cron: '0 21 * * 1-5'   # 5:00 PM VET
+    - cron: '30 21 * * 1-5'  # 5:30 PM VET
+    - cron: '0 22 * * 1-5'   # 6:00 PM VET
+    - cron: '30 22 * * 1-5'  # 6:30 PM VET
+    - cron: '0 23 * * 1-5'   # 7:00 PM VET
+    - cron: '30 23 * * 1-5'  # 7:30 PM VET
+    - cron: '0 0 * * 2-6'    # 8:00 PM VET (ya es martes–sábado en UTC)
   workflow_dispatch:
 
 jobs:
@@ -31,17 +34,20 @@ jobs:
         run: pip install requests beautifulsoup4
 
       - name: Ejecutar script
-        run: python actualizar_tasas.py
+        id: ejecutar
+        run: |
+          python actualizar_tasas.py
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
 
       - name: Subir cambios
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add .
-          # Solo hace commit si hay cambios detectados
+          # Solo hace commit si hay archivos nuevos o modificados
           if ! git diff --cached --exit-code; then
             git commit -m "Auto: Actualizacion tasas ${{ github.run_id }}"
             git push
           else
-            echo "Sin cambios, todo está al día."
+            echo "Sin cambios: las tasas de hoy ya estaban registradas o no hay datos nuevos."
           fi
